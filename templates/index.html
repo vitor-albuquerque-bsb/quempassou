@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quem Passou?</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        /* Adicione um estilo para ocultar a tabela e os botões inicialmente */
+        #data-table, #pagination-buttons {
+            display: none;
+        }
+
+        /* Adicione um estilo para as imagens */
+        .result-image {
+            max-width: 100%;
+            height: auto;
+            display: none;
+            margin: 0 auto;
+        }
+
+        .image-container {
+            text-align: center;
+        }
+
+        /* Adicione um estilo para ocultar a linha de registros por página quando 'Todos' for selecionado */
+        #records_per_page_row {
+            display: block; /* Exibe por padrão */
+        }
+
+        #records_per_page_row.hide {
+            display: none; /* Oculta quando a classe 'hide' for adicionada */
+        }
+
+        /* Estilo para linhas pares */
+        #data-table tbody tr:nth-child(even) {
+            background-color: #f2f2f2;
+        }
+
+        /* Estilo para linhas ímpares */
+        #data-table tbody tr:nth-child(odd) {
+            background-color: #ffffff;
+        }
+
+        /* Estilo para alterar a cor do texto ao passar o mouse */
+        #data-table tbody tr:hover {
+            color: blue;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="fixed-top">
+        Portal beta desenvolvido e mantido por: Vítor Albuquerque | Quer sugerir ou solicitar a inclusão de um certame? Envie um e-mail para: concurseiro.bat@gmail.com
+    </div>
+    <div class="content">      
+        <div class="container">
+            <img src="{{ url_for('static', filename='logo.png') }}" alt="Quem Passou?">
+            <div class="filter-row">
+                <div>
+                    <label for="filter_orgao">Órgão:</label>
+                    <select id="filter_orgao" onchange="loadData()">
+                        <option value="">Todos</option>
+                        {% for orgao in orgaos %}
+                            <option value="{{ orgao }}">{{ orgao }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="filter_ano_edital">Ano de Edital:</label>
+                    <select id="filter_ano_edital" onchange="loadData()">
+                        <option value="">Todos</option>
+                        {% for ano in anos %}
+                            <option value="{{ ano }}">{{ ano }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+            </div>
+
+            <div class="filter-row">
+                <div>
+                    <label for="filter_cargo_especialidade">Cargo/Especialidade:</label>
+                    <select id="filter_cargo_especialidade" onchange="loadData()">
+                        <option value="">Todos</option>
+                        {% for cargo in cargos %}
+                            <option value="{{ cargo }}">{{ cargo }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div>
+                    <label for="filter_nome_candidato">Candidato:</label>
+                    <input type="text" id="filter_nome_candidato" placeholder="Digite sua pesquisa..." oninput="loadData()">
+                </div>
+            </div>
+
+            <button id="clear_filters_button" class="clear-filters-button" onclick="clearFilters()">Limpar Filtros</button>
+
+            <!-- Seletor de registros por página -->
+            <div class="filter-row" id="records_per_page_row">
+                <div>
+                    <label for="records_per_page">Registros por página:</label>
+                    <select id="records_per_page" onchange="loadData()">
+                        <option value="5">5</option>
+                        <option value="10">10</option>
+                        <option value="20">20</option>
+                        <option value="50">50</option>
+                        <option value="all">Todos</option>
+                    </select>
+                </div>
+            </div>
+            
+            <!-- Adicione as imagens dentro de um contêiner centralizado -->
+            <div class="image-container">
+                <img id="initial-image" class="result-image" src="{{ url_for('static', filename='initial.png') }}" alt="Imagem Inicial">
+                <img id="no-results-image" class="result-image" src="{{ url_for('static', filename='notfound.png') }}" alt="Nenhum resultado encontrado">
+            </div>
+
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>Ano do Edital</th>
+                        <th>Cargo/Especialidade</th>
+                        <th>Posição</th>
+                        <th>Número de Inscrição</th>
+                        <th>Nome do Candidato</th>
+                        <th>Nome do Órgão</th>
+                        <th>Nota Final Final</th>
+                        <th>Tipo de Cadastro</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+            
+            <div id="pagination-buttons">
+                <button onclick="prevPage()">Página Anterior</button>
+                <button onclick="nextPage()">Próxima Página</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let currentPage = 1;
+
+        function loadData(page = 1) {
+            const filterOrgao = document.getElementById('filter_orgao').value;
+            const filterAnoEdital = document.getElementById('filter_ano_edital').value;
+            const filterCargoEspecialidade = document.getElementById('filter_cargo_especialidade').value;
+            const filterNomeCandidato = document.getElementById('filter_nome_candidato').value;
+            const recordsPerPage = document.getElementById('records_per_page').value;
+
+            fetch(`/data?filter_orgao=${filterOrgao}&filter_ano_edital=${filterAnoEdital}&filter_cargo_especialidade=${filterCargoEspecialidade}&filter_nome_candidato=${filterNomeCandidato}&page=${page}&page_size=${recordsPerPage}`)
+                .then(response => response.json())
+                .then(data => {
+                    const tableBody = document.getElementById('table-body');
+                    tableBody.innerHTML = '';
+
+                    if (data.data.length > 0) {
+                        // Exibe a tabela e os botões de paginação se houver resultados
+                        document.getElementById('data-table').style.display = 'table';
+                        document.getElementById('no-results-image').style.display= 'none';
+document.getElementById('initial-image').style.display = 'none';
+document.getElementById('pagination-buttons').style.display = recordsPerPage === 'all' ? 'none' : 'block';
+document.getElementById('records_per_page_row').style.display = 'flex';                    data.data.forEach((row, index) => {
+                        const tr = document.createElement('tr');
+                        Object.values(row).forEach(value => {
+                            const td = document.createElement('td');
+                            td.textContent = value;
+                            tr.appendChild(td);
+                        });
+                       
+                        if (index % 2 === 0) {
+                            tr.classList.add('even-row');
+                        } else {
+                            tr.classList.add('odd-row');
+                        }
+                        tableBody.appendChild(tr);
+                    });
+
+                    currentPage = page;
+                } else {
+                    // Exibe a imagem de "nenhum resultado encontrado" se não houver resultados
+                    document.getElementById('data-table').style.display = 'none';
+                    document.getElementById('initial-image').style.display = 'none';
+                    document.getElementById('no-results-image').style.display = 'block';
+                    document.getElementById('pagination-buttons').style.display = 'none';
+                    document.getElementById('records_per_page_row').style.display = 'none';
+                }
+            });
+    }
+
+    function nextPage() {
+        loadData(currentPage + 1);
+    }
+
+    function prevPage() {
+        loadData(currentPage - 1);
+    }
+
+    function clearFilters() {
+        document.getElementById('filter_orgao').value = '';
+        document.getElementById('filter_ano_edital').value = '';
+        document.getElementById('filter_cargo_especialidade').value = '';
+        document.getElementById('filter_nome_candidato').value = '';
+        loadData();
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+        // Exibe a imagem inicial ao carregar a página
+        document.getElementById('initial-image').style.display = 'block';
+        document.getElementById('no-results-image').style.display = 'none';
+        document.getElementById('data-table').style.display = 'none';
+        document.getElementById('records_per_page_row').classList.add('hide'); // Oculta por padrão
+    });
+
+    document.getElementById('filter_orgao').addEventListener('change', () => {
+        loadData();
+    });
+
+</script>
+
